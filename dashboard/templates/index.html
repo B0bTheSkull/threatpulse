@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThreatPulse — Threat Intelligence Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, monospace; background: #0d1117; color: #c9d1d9; }
+  header { background: #161b22; border-bottom: 1px solid #30363d; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
+  header h1 { color: #58a6ff; font-size: 1.4rem; }
+  header span { color: #8b949e; font-size: 0.85rem; }
+  .container { max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
+  .search-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
+  .search-box h2 { color: #58a6ff; margin-bottom: 1rem; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .input-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  input[type=text] { flex: 1; min-width: 200px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 0.6rem 1rem; border-radius: 6px; font-size: 0.95rem; }
+  select { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 0.6rem 1rem; border-radius: 6px; }
+  button { background: #1f6feb; color: #fff; border: none; padding: 0.6rem 1.5rem; border-radius: 6px; cursor: pointer; font-size: 0.95rem; }
+  button:hover { background: #388bfd; }
+  #result { margin-top: 1.5rem; }
+  .threat-badge { display: inline-block; padding: 0.3rem 1rem; border-radius: 20px; font-weight: bold; font-size: 0.9rem; margin-bottom: 1rem; }
+  .MALICIOUS { background: #ff4444; color: #000; }
+  .CLEAN { background: #51cf66; color: #000; }
+  .source-card { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 1rem; margin-bottom: 0.75rem; }
+  .source-name { color: #58a6ff; font-weight: bold; margin-bottom: 0.5rem; }
+  .found-yes { color: #ff4444; font-weight: bold; }
+  .found-no { color: #51cf66; }
+  .meta { color: #8b949e; font-size: 0.85rem; }
+  table.meta-table { width: 100%; font-size: 0.85rem; border-collapse: collapse; margin-top: 0.5rem; }
+  table.meta-table td { padding: 2px 6px; }
+  table.meta-table td:first-child { color: #8b949e; width: 130px; }
+  .history-section h2 { color: #58a6ff; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
+  .history-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .history-table th { text-align: left; color: #8b949e; padding: 0.5rem; border-bottom: 1px solid #30363d; }
+  .history-table td { padding: 0.5rem; border-bottom: 1px solid #21262d; }
+  .history-table tr:hover td { background: #161b22; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.78rem; font-weight: bold; }
+  .pill.MALICIOUS { background: #3d0000; color: #ff4444; }
+  .pill.CLEAN { background: #003322; color: #51cf66; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ ThreatPulse</h1>
+  <span>Threat Intelligence Dashboard</span>
+</header>
+<div class="container">
+  <div class="search-box">
+    <h2>IOC Lookup</h2>
+    <div class="input-row">
+      <input type="text" id="ioc-input" placeholder="Enter IP, domain, URL, or file hash...">
+      <select id="ioc-type">
+        <option value="ip">IP Address</option>
+        <option value="domain">Domain</option>
+        <option value="url">URL</option>
+        <option value="hash">File Hash</option>
+      </select>
+      <button onclick="doLookup()">Lookup</button>
+    </div>
+    <div id="result"></div>
+  </div>
+
+  {% if history %}
+  <div class="history-section">
+    <h2>Recent Lookups</h2>
+    <table class="history-table">
+      <tr><th>Time</th><th>IOC</th><th>Type</th><th>Result</th></tr>
+      {% for entry in history %}
+      <tr>
+        <td class="meta">{{ entry.timestamp[:16].replace('T',' ') }}</td>
+        <td>{{ entry.ioc }}</td>
+        <td class="meta">{{ entry.type }}</td>
+        <td><span class="pill {{ entry.threat_level }}">{{ entry.threat_level }}</span></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+async function doLookup() {
+  const ioc = document.getElementById('ioc-input').value.trim();
+  const type = document.getElementById('ioc-type').value;
+  const resultDiv = document.getElementById('result');
+
+  if (!ioc) return;
+  resultDiv.innerHTML = '<p style="color:#8b949e">Looking up ' + ioc + '...</p>';
+
+  const fd = new FormData();
+  fd.append('ioc', ioc);
+  fd.append('type', type);
+
+  try {
+    const r = await fetch('/lookup', { method: 'POST', body: fd });
+    const data = await r.json();
+
+    let html = `<span class="threat-badge ${data.threat_level}">${data.threat_level}</span>`;
+    html += `<p class="meta" style="margin-bottom:1rem">${data.ioc} (${data.type}) — queried ${data.sources_queried} sources</p>`;
+
+    for (const src of data.results || []) {
+      html += `<div class="source-card">`;
+      html += `<div class="source-name">${src.source || 'Unknown'}</div>`;
+      if (src.error) {
+        html += `<div class="meta">Error: ${src.error}</div>`;
+      } else if (src.skipped) {
+        html += `<div class="meta">${src.reason}</div>`;
+      } else {
+        html += src.found
+          ? `<div class="found-yes">⚠ FOUND — malicious</div>`
+          : `<div class="found-no">✓ Not listed</div>`;
+        html += '<table class="meta-table">';
+        for (const [k, v] of Object.entries(src)) {
+          if (['source','found','raw'].includes(k) || v === null || v === undefined) continue;
+          const val = Array.isArray(v) ? v.join(', ') : v;
+          html += `<tr><td>${k.replace(/_/g,' ')}</td><td>${val}</td></tr>`;
+        }
+        html += '</table>';
+      }
+      html += '</div>';
+    }
+    resultDiv.innerHTML = html;
+  } catch(e) {
+    resultDiv.innerHTML = '<p style="color:#ff4444">Request failed: ' + e + '</p>';
+  }
+}
+
+document.getElementById('ioc-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLookup();
+});
+</script>
+</body>
+</html>
