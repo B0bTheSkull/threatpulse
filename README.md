@@ -122,6 +122,19 @@ Run `python threatpulse.py serve` and navigate to `http://localhost:5000` for a 
 
 ---
 
+## MITRE ATT&CK Coverage
+
+ThreatPulse aggregates IOCs that map to attacker infrastructure across the following ATT&CK tactics. Use it during triage to enrich an indicator with the techniques that IOC type is typically associated with.
+
+| IOC Type | Source(s) | Tactic | Mapped Techniques |
+|---|---|---|---|
+| Botnet C2 IPs | Feodo Tracker | Command and Control | [T1071 — Application Layer Protocol](https://attack.mitre.org/techniques/T1071/), [T1090 — Proxy](https://attack.mitre.org/techniques/T1090/) |
+| Malicious URLs | URLhaus | Initial Access | [T1566.002 — Spearphishing Link](https://attack.mitre.org/techniques/T1566/002/), [T1189 — Drive-by Compromise](https://attack.mitre.org/techniques/T1189/) |
+| Malware file hashes | MalwareBazaar | Execution | [T1204.002 — Malicious File](https://attack.mitre.org/techniques/T1204/002/), [T1059 — Command and Scripting Interpreter](https://attack.mitre.org/techniques/T1059/) |
+| OTX Pulses (campaign indicators) | AlienVault OTX | Multiple | Varies per pulse — typically covers Initial Access, C2, and Exfiltration |
+
+---
+
 ## Roadmap
 
 - [ ] Shodan integration
