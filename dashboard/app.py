@@ -2,6 +2,7 @@
 import json
 import os
 import sys
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -12,23 +13,26 @@ import lookup as lookup_module
 
 app = Flask(__name__)
 HISTORY_FILE = Path(__file__).parent.parent / "lookup_history.json"
+_HISTORY_LOCK = threading.Lock()
 
 
 def save_history(ioc, ioc_type, result):
-    history = []
-    if HISTORY_FILE.exists():
-        try:
-            history = json.loads(HISTORY_FILE.read_text())
-        except Exception:
-            pass
-    history.insert(0, {
-        "timestamp": datetime.now().isoformat(),
-        "ioc": ioc,
-        "type": ioc_type,
-        "threat_level": result.get("threat_level", "UNKNOWN")
-    })
-    history = history[:100]  # Keep last 100
-    HISTORY_FILE.write_text(json.dumps(history))
+    # Serialize the read-modify-write so concurrent requests can't corrupt the file.
+    with _HISTORY_LOCK:
+        history = []
+        if HISTORY_FILE.exists():
+            try:
+                history = json.loads(HISTORY_FILE.read_text())
+            except Exception:
+                pass
+        history.insert(0, {
+            "timestamp": datetime.now().isoformat(),
+            "ioc": ioc,
+            "type": ioc_type,
+            "threat_level": result.get("threat_level", "UNKNOWN")
+        })
+        history = history[:100]  # Keep last 100
+        HISTORY_FILE.write_text(json.dumps(history))
 
 
 def get_history():
@@ -60,4 +64,4 @@ def do_lookup():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="127.0.0.1", port=5000, debug=False)

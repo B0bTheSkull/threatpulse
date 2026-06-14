@@ -105,14 +105,16 @@ def cmd_feed(args):
 
 def cmd_serve(args):
     banner()
-    print(f"{CYAN}[*]{RESET} Starting web dashboard on http://0.0.0.0:{args.port}")
+    # Bind to loopback by default; only expose on all interfaces if explicitly requested.
+    host = "0.0.0.0" if getattr(args, "listen_all", False) else "127.0.0.1"
+    print(f"{CYAN}[*]{RESET} Starting web dashboard on http://{host}:{args.port}")
     print(f"{CYAN}[*]{RESET} Open http://localhost:{args.port} in your browser")
     print(f"{CYAN}[*]{RESET} Press Ctrl+C to stop\n")
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent))
     from dashboard.app import app
-    app.run(host="0.0.0.0", port=args.port, debug=False)
+    app.run(host=host, port=args.port, debug=False)
 
 
 def main():
@@ -149,6 +151,8 @@ Environment:
     # serve subcommand
     serve_p = subparsers.add_parser("serve", help="Start web dashboard")
     serve_p.add_argument("--port", type=int, default=5000, help="Port to listen on (default: 5000)")
+    serve_p.add_argument("--listen-all", action="store_true",
+                         help="Bind on all interfaces (0.0.0.0) instead of localhost only")
 
     args = parser.parse_args()
 

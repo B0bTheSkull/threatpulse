@@ -86,7 +86,17 @@ async function doLookup() {
   const resultDiv = document.getElementById('result');
 
   if (!ioc) return;
-  resultDiv.innerHTML = '<p style="color:#8b949e">Looking up ' + ioc + '...</p>';
+
+  // Helper: create an element with a class and text content (no HTML injection).
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = text;
+    return node;
+  }
+
+  resultDiv.replaceChildren(el('p', null, 'Looking up ' + ioc + '...'));
+  resultDiv.firstChild.style.color = '#8b949e';
 
   const fd = new FormData();
   fd.append('ioc', ioc);
@@ -96,33 +106,47 @@ async function doLookup() {
     const r = await fetch('/lookup', { method: 'POST', body: fd });
     const data = await r.json();
 
-    let html = `<span class="threat-badge ${data.threat_level}">${data.threat_level}</span>`;
-    html += `<p class="meta" style="margin-bottom:1rem">${data.ioc} (${data.type}) — queried ${data.sources_queried} sources</p>`;
+    const frag = document.createDocumentFragment();
+
+    // threat_level controls a CSS class — restrict to a known allowlist so it
+    // cannot break out into other attributes/markup.
+    const safeLevel = (data.threat_level === 'MALICIOUS' || data.threat_level === 'CLEAN')
+      ? data.threat_level : '';
+    frag.appendChild(el('span', 'threat-badge ' + safeLevel, data.threat_level));
+
+    const meta = el('p', 'meta', `${data.ioc} (${data.type}) — queried ${data.sources_queried} sources`);
+    meta.style.marginBottom = '1rem';
+    frag.appendChild(meta);
 
     for (const src of data.results || []) {
-      html += `<div class="source-card">`;
-      html += `<div class="source-name">${src.source || 'Unknown'}</div>`;
+      const card = el('div', 'source-card');
+      card.appendChild(el('div', 'source-name', src.source || 'Unknown'));
       if (src.error) {
-        html += `<div class="meta">Error: ${src.error}</div>`;
+        card.appendChild(el('div', 'meta', 'Error: ' + src.error));
       } else if (src.skipped) {
-        html += `<div class="meta">${src.reason}</div>`;
+        card.appendChild(el('div', 'meta', src.reason));
       } else {
-        html += src.found
-          ? `<div class="found-yes">⚠ FOUND — malicious</div>`
-          : `<div class="found-no">✓ Not listed</div>`;
-        html += '<table class="meta-table">';
+        card.appendChild(src.found
+          ? el('div', 'found-yes', '⚠ FOUND — malicious')
+          : el('div', 'found-no', '✓ Not listed'));
+        const table = el('table', 'meta-table');
         for (const [k, v] of Object.entries(src)) {
           if (['source','found','raw'].includes(k) || v === null || v === undefined) continue;
           const val = Array.isArray(v) ? v.join(', ') : v;
-          html += `<tr><td>${k.replace(/_/g,' ')}</td><td>${val}</td></tr>`;
+          const tr = document.createElement('tr');
+          tr.appendChild(el('td', null, k.replace(/_/g,' ')));
+          tr.appendChild(el('td', null, val));
+          table.appendChild(tr);
         }
-        html += '</table>';
+        card.appendChild(table);
       }
-      html += '</div>';
+      frag.appendChild(card);
     }
-    resultDiv.innerHTML = html;
+    resultDiv.replaceChildren(frag);
   } catch(e) {
-    resultDiv.innerHTML = '<p style="color:#ff4444">Request failed: ' + e + '</p>';
+    const p = el('p', null, 'Request failed: ' + e);
+    p.style.color = '#ff4444';
+    resultDiv.replaceChildren(p);
   }
 }
 
