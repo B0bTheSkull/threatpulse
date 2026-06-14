@@ -1,5 +1,6 @@
 """Flask web dashboard for ThreatPulse."""
 import json
+import logging
 import os
 import sys
 import threading
@@ -10,6 +11,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from flask import Flask, render_template, request, jsonify
 import lookup as lookup_module
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 HISTORY_FILE = Path(__file__).parent.parent / "lookup_history.json"
@@ -24,7 +27,7 @@ def save_history(ioc, ioc_type, result):
             try:
                 history = json.loads(HISTORY_FILE.read_text())
             except Exception:
-                pass
+                logger.warning("Could not read history file %s; starting fresh", HISTORY_FILE, exc_info=True)
         history.insert(0, {
             "timestamp": datetime.now().isoformat(),
             "ioc": ioc,
@@ -40,7 +43,7 @@ def get_history():
         try:
             return json.loads(HISTORY_FILE.read_text())
         except Exception:
-            pass
+            logger.warning("Could not read history file %s", HISTORY_FILE, exc_info=True)
     return []
 
 

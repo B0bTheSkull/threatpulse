@@ -1,8 +1,11 @@
 """Feodo Tracker C2 IP blocklist."""
 import json
+import logging
 import time
 from pathlib import Path
 import requests
+
+logger = logging.getLogger(__name__)
 
 FEODO_URL = "https://feodotracker.abuse.ch/downloads/ipblocklist.json"
 CACHE_FILE = Path(".cache_feodo.json")
@@ -17,7 +20,7 @@ def _load_cache():
             if time.time() - data.get("fetched_at", 0) < CACHE_TTL:
                 return data.get("blocklist", [])
         except Exception:
-            pass
+            logger.warning("Could not read Feodo cache %s; will refetch", CACHE_FILE, exc_info=True)
     return None
 
 
